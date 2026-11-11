@@ -6,19 +6,13 @@ import WalletCard from "./components/WalletCard";
 import TransactionList from "./components/TransactionList";
 import Login from "./components/Login";
 import Register from "./components/Register";
+import NotificationCenter from "./components/NotificationCenter";
 
 import { useWallet } from "./context/WalletContext";
 import { useAuth } from "./context/AuthContext";
+import { useSocket } from "./context/SocketContext";
 
 function App() {
-  // Authentication context
-  const {
-    user,
-    isAuthenticated,
-    logout,
-  } = useAuth();
-
-  // Wallet context
   const {
     balance,
     transactions,
@@ -28,50 +22,56 @@ function App() {
     error,
   } = useWallet();
 
-  // Navigation and UI states
+  const { user, isAuthenticated, logout } = useAuth();
+  const { connected } = useSocket();
+
   const [activePage, setActivePage] = useState("Dashboard");
   const [showRegister, setShowRegister] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
-
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("");
 
-  // Wallet card information
-  const cards = [
+  // Wallet card details
+  const walletCards = [
     {
-      id: 1,
       bank: "WalletPay",
       type: "VISA",
-      holder: user?.name?.toUpperCase() || "WALLET USER",
-      number: "4582",
-      background: "bg-gradient-to-br from-indigo-600 to-purple-700",
+      holder: user?.name || "Wallet User",
+      number: "4829",
+      background:
+        "bg-gradient-to-r from-indigo-600 to-purple-600",
     },
     {
-      id: 2,
-      bank: "WalletPay",
-      type: "MASTER",
-      holder: user?.name?.toUpperCase() || "WALLET USER",
+      bank: "WalletPay Black",
+      type: "MASTERCARD",
+      holder: user?.name || "Wallet User",
       number: "8291",
-      background: "bg-gradient-to-br from-gray-800 to-gray-950",
+      background:
+        "bg-gradient-to-r from-gray-900 via-gray-800 to-black",
     },
   ];
 
-  // Calculate total income
+  // Calculate income and expenses
   const totalIncome = transactions
-    .filter((item) => item.type === "income")
-    .reduce((total, item) => total + item.amount, 0);
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
-  // Calculate total expenses
   const totalExpenses = transactions
-    .filter((item) => item.type === "expense")
-    .reduce((total, item) => total + item.amount, 0);
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
-  // Handle Add Money
+  // Add money
   const handleAddMoney = async () => {
-    const numericAmount = Number(amount);
+    const value = Number(amount);
 
-    const result = await addMoney(numericAmount);
+    if (!Number.isFinite(value) || value <= 0) {
+      setMessage("Please enter a valid amount.");
+      setMessageType("error");
+      return;
+    }
+
+    const result = await addMoney(value);
 
     setMessage(result.message);
     setMessageType(result.success ? "success" : "error");
@@ -81,11 +81,17 @@ function App() {
     }
   };
 
-  // Handle Send Money
+  // Send money
   const handleSendMoney = async () => {
-    const numericAmount = Number(amount);
+    const value = Number(amount);
 
-    const result = await sendMoney(numericAmount);
+    if (!Number.isFinite(value) || value <= 0) {
+      setMessage("Please enter a valid amount.");
+      setMessageType("error");
+      return;
+    }
+
+    const result = await sendMoney(value);
 
     setMessage(result.message);
     setMessageType(result.success ? "success" : "error");
@@ -95,313 +101,324 @@ function App() {
     }
   };
 
-  // Show Login/Register before dashboard
+  // Login / Register screen
   if (!isAuthenticated) {
     return showRegister ? (
-      <Register
-        onSwitch={() => setShowRegister(false)}
-      />
+      <Register onSwitch={() => setShowRegister(false)} />
     ) : (
-      <Login
-        onSwitch={() => setShowRegister(true)}
-      />
+      <Login onSwitch={() => setShowRegister(true)} />
     );
   }
 
-  // Page descriptions
-  const pageDescription = {
-    Dashboard: "Welcome back! Manage your digital wallet.",
-    "My Cards": "View your available digital wallet cards.",
-    Transactions: "View all your wallet transactions.",
-    History: "Review your transaction history.",
-    Settings: "Manage your wallet preferences.",
-  };
-
-  // Wallet cards section
-  const renderWalletCards = () => (
-    <section className="mb-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-800">
-          My Wallet Cards
-        </h2>
-
-        <button className="bg-indigo-600 text-white px-5 py-3 rounded-xl text-sm font-semibold w-full sm:w-auto">
-          + Add Card
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {cards.map((card) => (
-          <WalletCard
-            key={card.id}
-            card={card}
-            showBalance={showBalance}
-          />
-        ))}
-      </div>
-    </section>
-  );
-
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-gray-100 lg:flex-row">
 
-      {/* Sidebar */}
+      {/* SIDEBAR */}
       <Sidebar
         activePage={activePage}
-        onNavigate={(page) => {
-          setActivePage(page);
-          setMessage("");
-        }}
+        onNavigate={setActivePage}
       />
 
-      {/* Main Content */}
-      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-10">
+      {/* MAIN CONTENT */}
+      <main className="min-w-0 flex-1 p-4 md:p-8">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+        {/* HEADER */}
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
 
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-              {activePage}
+            <h1 className="text-2xl font-bold text-gray-800">
+              {activePage === "Dashboard"
+                ? "WalletPay Dashboard"
+                : activePage}
             </h1>
 
-            <p className="text-gray-400 text-sm mt-2">
-              {pageDescription[activePage]}
+            <p className="mt-1 text-sm text-gray-500">
+              Welcome back, {user?.name || "User"}!
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
 
-            <button className="bg-white p-3 rounded-xl shadow-sm">
-              🔔
-            </button>
+            {/* SOCKET CONNECTION STATUS */}
+            <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm">
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${
+                  connected ? "bg-green-500" : "bg-red-500"
+                }`}
+              />
 
-            <div className="flex items-center gap-2">
-
-              <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">
-                {user?.name?.charAt(0).toUpperCase()}
-              </div>
-
-              <div>
-                <p className="font-semibold text-sm">
-                  {user?.name}
-                </p>
-
-                <p className="text-xs text-gray-400">
-                  {user?.role === "admin"
-                    ? "Administrator"
-                    : "Personal Account"}
-                </p>
-              </div>
-
+              <span className="text-xs text-gray-600">
+                {connected ? "Live" : "Offline"}
+              </span>
             </div>
 
+            {/* NOTIFICATIONS */}
+            <NotificationCenter />
+
+            {/* USER ROLE */}
+            <span className="rounded-full bg-blue-100 px-3 py-2 text-xs font-semibold text-blue-700">
+              {user?.role || "user"}
+            </span>
+
+            {/* LOGOUT */}
             <button
               onClick={logout}
-              className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-semibold"
+              className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
             >
               Logout
             </button>
 
           </div>
-        </div>
+        </header>
 
-        {/* Loading and Error Messages */}
+        {/* LOADING */}
         {loading && (
-          <div className="bg-indigo-50 text-indigo-600 p-4 rounded-xl mb-6 text-sm">
-            Loading your wallet data...
-          </div>
+          <p className="mb-4 text-sm text-blue-600">
+            Loading wallet information...
+          </p>
         )}
 
+        {/* ERROR */}
         {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 text-sm">
+          <p className="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-600">
             {error}
-          </div>
+          </p>
         )}
 
-        {/* DASHBOARD PAGE */}
+        {/* ================= DASHBOARD ================= */}
         {activePage === "Dashboard" && (
-          <>
-            {/* Balance Overview */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+          <div className="space-y-8">
 
-              {/* Total Balance */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
+            {/* BALANCE SUMMARY */}
+            <section className="grid grid-cols-1 gap-5 md:grid-cols-3">
+
+              {/* TOTAL BALANCE */}
+              <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white shadow-lg">
 
                 <div className="flex items-center justify-between">
-                  <p className="text-gray-400 text-sm">
-                    Total Balance
+                  <p className="text-sm text-blue-100">
+                    Total Wallet Balance
                   </p>
 
                   <button
                     onClick={() => setShowBalance(!showBalance)}
-                    className="text-indigo-600 text-sm font-semibold"
+                    title="Hide or show balance"
+                    className="text-xl"
                   >
-                    {showBalance ? "Hide 👁" : "Show 👁"}
+                    {showBalance ? "👁" : "🙈"}
                   </button>
                 </div>
 
-                <h2 className="text-3xl font-bold mt-4 text-gray-800">
+                <h2 className="mt-4 text-3xl font-bold">
                   {showBalance
-                    ? `₹${balance.toLocaleString("en-IN")}`
-                    : "₹ ••••••"}
+                    ? `₹${Number(balance).toLocaleString("en-IN")}`
+                    : "₹••••••"}
                 </h2>
 
-                <p className="text-green-500 text-sm mt-3">
-                  Available Wallet Balance
+                <p className="mt-3 text-xs text-blue-100">
+                  Available wallet balance
                 </p>
-
               </div>
 
-              {/* Total Income */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <p className="text-gray-400 text-sm">
+              {/* INCOME */}
+              <div className="rounded-2xl bg-white p-6 shadow-sm">
+                <p className="text-sm text-gray-500">
                   Total Income
                 </p>
 
-                <h2 className="text-3xl font-bold mt-4 text-gray-800">
-                  ₹{totalIncome.toLocaleString("en-IN")}
+                <h2 className="mt-4 text-2xl font-bold text-green-600">
+                  + ₹{totalIncome.toLocaleString("en-IN")}
                 </h2>
-
-                <p className="text-green-500 text-sm mt-3">
-                  Money received
-                </p>
               </div>
 
-              {/* Total Expenses */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <p className="text-gray-400 text-sm">
+              {/* EXPENSES */}
+              <div className="rounded-2xl bg-white p-6 shadow-sm">
+                <p className="text-sm text-gray-500">
                   Total Expenses
                 </p>
 
-                <h2 className="text-3xl font-bold mt-4 text-gray-800">
-                  ₹{totalExpenses.toLocaleString("en-IN")}
+                <h2 className="mt-4 text-2xl font-bold text-red-500">
+                  - ₹{totalExpenses.toLocaleString("en-IN")}
                 </h2>
-
-                <p className="text-red-500 text-sm mt-3">
-                  Money spent
-                </p>
               </div>
 
-            </div>
+            </section>
 
-            {/* Wallet Cards */}
-            {renderWalletCards()}
+            {/* WALLET CARDS */}
+            <section>
 
-            {/* Quick Money Transfer */}
-            <section className="bg-white rounded-2xl shadow-sm p-6 mb-8">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
 
-              <h2 className="text-xl font-bold text-gray-800 mb-2">
-                Quick Money Transfer
+                <h2 className="text-xl font-bold text-gray-800">
+                  My Wallet Cards
+                </h2>
+
+                <button
+                  onClick={() => setShowBalance(!showBalance)}
+                  className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow-sm hover:bg-indigo-50"
+                >
+                  {showBalance
+                    ? "🙈 Hide Card Balances"
+                    : "👁 Show Card Balances"}
+                </button>
+
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+
+                {walletCards.map((card) => (
+                  <WalletCard
+                    key={card.number}
+                    card={card}
+                    showBalance={showBalance}
+                  />
+                ))}
+
+              </div>
+            </section>
+
+            {/* QUICK TRANSACTIONS */}
+            <section className="rounded-2xl bg-white p-6 shadow-sm">
+
+              <h2 className="mb-5 text-xl font-bold text-gray-800">
+                Quick Transactions
               </h2>
 
-              <p className="text-sm text-gray-400 mb-6">
-                Add money or send money using your wallet.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row">
 
                 <input
                   type="number"
-                  min="0.01"
-                  step="0.01"
+                  min="0"
                   placeholder="Enter amount (₹)"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full sm:flex-1 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
+                  onChange={(e) => {
+                    setAmount(e.target.value);
+                    setMessage("");
+                  }}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
                 />
 
                 <button
                   onClick={handleAddMoney}
                   disabled={loading}
-                  className="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-semibold transition disabled:opacity-50"
+                  className="rounded-lg bg-green-600 px-6 py-3 font-medium text-white hover:bg-green-700 disabled:opacity-50"
                 >
-                  + Add Money
+                  Add Money
                 </button>
 
                 <button
                   onClick={handleSendMoney}
                   disabled={loading}
-                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transition disabled:opacity-50"
+                  className="rounded-lg bg-red-500 px-6 py-3 font-medium text-white hover:bg-red-600 disabled:opacity-50"
                 >
-                  ↗ Send Money
+                  Send Money
                 </button>
 
               </div>
 
               {message && (
-                <div
-                  className={`mt-5 p-4 rounded-xl text-sm font-semibold ${
+                <p
+                  className={`mt-4 text-sm ${
                     messageType === "success"
-                      ? "bg-green-50 text-green-600"
-                      : "bg-red-50 text-red-600"
+                      ? "text-green-600"
+                      : "text-red-600"
                   }`}
                 >
                   {message}
-                </div>
+                </p>
               )}
 
             </section>
 
-            {/* Recent Transactions */}
-            <section className="mb-8">
+            {/* RECENT TRANSACTIONS */}
+            <section>
               <TransactionList />
             </section>
-          </>
+
+          </div>
         )}
 
-        {/* MY CARDS PAGE */}
+        {/* ================= MY CARDS ================= */}
         {activePage === "My Cards" && (
-          renderWalletCards()
+          <section>
+
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+
+              <h2 className="text-xl font-bold text-gray-800">
+                Your Wallet Cards
+              </h2>
+
+              <button
+                onClick={() => setShowBalance(!showBalance)}
+                className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow-sm hover:bg-indigo-50"
+              >
+                {showBalance
+                  ? "🙈 Hide Card Balances"
+                  : "👁 Show Card Balances"}
+              </button>
+
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+
+              {walletCards.map((card) => (
+                <WalletCard
+                  key={card.number}
+                  card={card}
+                  showBalance={showBalance}
+                />
+              ))}
+
+            </div>
+
+          </section>
         )}
 
-        {/* TRANSACTIONS PAGE */}
+        {/* ================= TRANSACTIONS ================= */}
         {activePage === "Transactions" && (
-          <section className="bg-white rounded-2xl shadow-sm p-6 mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-5">
-              All Transactions
-            </h2>
-
+          <section>
             <TransactionList />
           </section>
         )}
 
-        {/* HISTORY PAGE */}
+        {/* ================= HISTORY ================= */}
         {activePage === "History" && (
-          <section className="bg-white rounded-2xl shadow-sm p-6 mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-5">
-              Transaction History
-            </h2>
-
+          <section>
             <TransactionList />
           </section>
         )}
 
-        {/* SETTINGS PAGE */}
+        {/* ================= SETTINGS ================= */}
         {activePage === "Settings" && (
-          <section className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-3">
-              Wallet Settings
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+
+            <h2 className="mb-5 text-xl font-bold text-gray-800">
+              Account Settings
             </h2>
 
-            <p className="text-gray-500 text-sm">
-              Settings options will be available here.
-            </p>
+            <div className="space-y-3 text-gray-600">
+
+              <p>
+                <strong>Name:</strong> {user?.name}
+              </p>
+
+              <p>
+                <strong>Email:</strong> {user?.email}
+              </p>
+
+              <p>
+                <strong>Role:</strong> {user?.role}
+              </p>
+
+              <p>
+                <strong>Socket Connection:</strong>{" "}
+                {connected ? "Connected" : "Disconnected"}
+              </p>
+
+            </div>
+
           </section>
         )}
-
-        {/* Footer */}
-        <footer className="flex flex-col sm:flex-row items-center justify-between gap-3 text-gray-400 text-xs py-5">
-
-          <p>
-            © 2026 WalletPay. All rights reserved.
-          </p>
-
-          <p className="hidden md:block">
-            Secure Digital Wallet
-          </p>
-
-        </footer>
 
       </main>
     </div>

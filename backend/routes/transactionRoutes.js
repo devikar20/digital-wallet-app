@@ -9,18 +9,32 @@ const router = express.Router();
 
 const OPENING_BALANCE = 73500;
 
+// Send real-time notification to the logged-in user's connected devices
+function sendWalletNotification(req, notification) {
+  const io = req.app.get("io");
+
+  if (!io) return;
+
+  io.to(`user:${req.user._id}`).emit("notification", {
+    ...notification,
+    createdAt: new Date(),
+  });
+}
+
 // Every transaction route requires login
 router.use(protect);
 
-// Calculate balance for the logged-in user
+// Calculate wallet balance for a particular user
 const calculateBalance = async (userId) => {
   const transactions = await Transaction.find({ user: userId });
 
   return transactions.reduce((balance, transaction) => {
-    return balance +
+    return (
+      balance +
       (transaction.type === "income"
         ? transaction.amount
-        : -transaction.amount);
+        : -transaction.amount)
+    );
   }, OPENING_BALANCE);
 };
 
@@ -147,6 +161,14 @@ router.post("/", async (req, res, next) => {
       date: date || new Date(),
     });
 
+    // REAL-TIME NOTIFICATION
+    sendWalletNotification(req, {
+      title: "New Transaction",
+      message: `${newTransaction.name} of ₹${newTransaction.amount} was added.`,
+      type: "success",
+      transactionId: newTransaction._id,
+    });
+
     res.status(201).json({
       success: true,
       message: "Transaction created successfully.",
@@ -235,6 +257,14 @@ router.put("/:id", async (req, res, next) => {
       }
     );
 
+    // REAL-TIME NOTIFICATION
+    sendWalletNotification(req, {
+      title: "Transaction Updated",
+      message: `${updatedTransaction.name} was updated successfully.`,
+      type: "info",
+      transactionId: updatedTransaction._id,
+    });
+
     res.status(200).json({
       success: true,
       message: "Transaction updated successfully.",
@@ -267,6 +297,14 @@ router.delete("/:id", async (req, res, next) => {
         message: "Transaction not found.",
       });
     }
+
+    // REAL-TIME NOTIFICATION
+    sendWalletNotification(req, {
+      title: "Transaction Deleted",
+      message: `${deletedTransaction.name} was deleted from your wallet.`,
+      type: "warning",
+      transactionId: deletedTransaction._id,
+    });
 
     res.status(200).json({
       success: true,

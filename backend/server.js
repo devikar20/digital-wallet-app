@@ -4,15 +4,35 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const http = require("http");
+
+const initializeSocket = require("./socket");
 
 const authRoutes = require("./routes/authRoutes");
 const transactionRoutes = require("./routes/transactionRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
+
+// Create HTTP server for Express and Socket.IO
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = initializeSocket(server);
+
+// Make Socket.IO available to Express routes
+app.set("io", io);
+
 const PORT = process.env.PORT || 5001;
 
-app.use(cors());
+// Middleware
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  })
+);
+
 app.use(express.json());
 
 // Welcome route
@@ -56,19 +76,25 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Connect MongoDB and start server
+// Connect MongoDB and start HTTP server
 const startServer = async () => {
   try {
     if (!process.env.MONGODB_URI || !process.env.JWT_SECRET) {
-      throw new Error("MONGODB_URI and JWT_SECRET must be configured in .env");
+      throw new Error(
+        "MONGODB_URI and JWT_SECRET must be configured in .env"
+      );
     }
 
     await mongoose.connect(process.env.MONGODB_URI);
 
     console.log("MongoDB Atlas connected successfully!");
 
-    app.listen(PORT, () => {
-      console.log(`WalletPay API running at http://localhost:${PORT}`);
+    server.listen(PORT, () => {
+      console.log(
+        `WalletPay API running at http://localhost:${PORT}`
+      );
+
+      console.log("Socket.IO server is running!");
     });
   } catch (error) {
     console.error("Server startup failed:", error.message);
