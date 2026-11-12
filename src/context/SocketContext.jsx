@@ -26,7 +26,7 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    const socket = io("http://localhost:5001", {
+    const socket = io({
       auth: {
         token,
       },

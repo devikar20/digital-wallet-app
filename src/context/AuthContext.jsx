@@ -7,7 +7,7 @@ import {
 
 const AuthContext = createContext();
 
-const API_URL = "http://localhost:5001/api/auth";
+const API_URL = "/api/auth";
 
 export const useAuth = () => {
   return useContext(AuthContext);
@@ -20,7 +20,6 @@ export const AuthProvider = ({ children }) => {
 
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem("walletUser");
-
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
@@ -45,6 +44,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       saveLogin(result);
+
       return {
         success: true,
         message: result.message,
@@ -94,7 +94,10 @@ export const AuthProvider = ({ children }) => {
   // Save token and user information
   const saveLogin = (result) => {
     localStorage.setItem("walletToken", result.token);
-    localStorage.setItem("walletUser", JSON.stringify(result.user));
+    localStorage.setItem(
+      "walletUser",
+      JSON.stringify(result.user)
+    );
 
     setToken(result.token);
     setUser(result.user);
