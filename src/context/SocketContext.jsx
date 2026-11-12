@@ -26,11 +26,14 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    io("https://walletpay-backend-4r7o.onrender.com", {
-  auth: {
-    token: token
-  }
-})
+    const socket = io(
+      "https://walletpay-backend-4r7o.onrender.com",
+      {
+        auth: {
+          token: token,
+        },
+      }
+    );
 
     socket.on("connect", () => {
       console.log("Connected to Socket.IO server:", socket.id);
@@ -58,7 +61,6 @@ export function SocketProvider({ children }) {
         ...previous,
       ]);
 
-      // Refresh wallet data without reloading the page
       refreshWallet();
     });
 
