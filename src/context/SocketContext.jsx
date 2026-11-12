@@ -26,11 +26,11 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    io(import.meta.env.VITE_API_URL, {
+    io("https://walletpay-backend-4r7o.onrender.com", {
   auth: {
-    token: token,
-  },
-});
+    token: token
+  }
+})
 
     socket.on("connect", () => {
       console.log("Connected to Socket.IO server:", socket.id);
