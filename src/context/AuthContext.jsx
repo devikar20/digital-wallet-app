@@ -7,7 +7,7 @@ import {
 
 const AuthContext = createContext();
 
-const API_URL = "/api/auth";
+const API_URL = `${import.meta.env.VITE_API_URL}/api/auth`;
 
 export const useAuth = () => {
   return useContext(AuthContext);

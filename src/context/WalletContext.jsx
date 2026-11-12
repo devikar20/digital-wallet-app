@@ -15,7 +15,7 @@ export const useWallet = () => {
   return useContext(WalletContext);
 };
 
-const API_URL = "http://localhost:5001/api/transactions";
+const API_URL = `${import.meta.env.VITE_API_URL}/api/transactions`;
 
 // Convert MongoDB transaction data into the format used by the UI
 const formatTransaction = (transaction) => ({

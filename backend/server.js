@@ -26,11 +26,14 @@ app.set("io", io);
 const PORT = process.env.PORT || 5001;
 
 // Middleware
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:8080",
+  "https://walletpay-frontend-t1a7.onrender.com"
+];
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:8080"
-  ],
+  origin: allowedOrigins,
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));

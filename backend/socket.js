@@ -5,11 +5,16 @@ const User = require("./models/User");
 
 function initializeSocket(server) {
   const io = new Server(server, {
-    cors: {
-      origin: "http://localhost:5173",
-      methods: ["GET", "POST"],
-    },
-  });
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:8080",
+      "https://walletpay-frontend-t1a7.onrender.com"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+});
 
   // Authenticate every Socket.IO connection using JWT
   io.use(async (socket, next) => {

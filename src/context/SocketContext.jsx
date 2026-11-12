@@ -26,11 +26,11 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    const socket = io({
-      auth: {
-        token,
-      },
-    });
+    io(import.meta.env.VITE_API_URL, {
+  auth: {
+    token: token,
+  },
+});
 
     socket.on("connect", () => {
       console.log("Connected to Socket.IO server:", socket.id);
