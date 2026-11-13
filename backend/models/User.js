@@ -17,6 +17,13 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    accountId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      match: /^\d{6}$/,
+    },
+
     password: {
       type: String,
       required: true,

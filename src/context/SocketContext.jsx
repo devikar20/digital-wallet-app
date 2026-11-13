@@ -26,22 +26,27 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    const socket = io(
-      "https://walletpay-backend-4r7o.onrender.com",
-      {
-        auth: {
-          token: token,
-        },
-      }
-    );
+    // Local development uses the Vite proxy.
+    // Production uses the configured backend URL.
+    const SOCKET_URL = import.meta.env.DEV
+      ? undefined
+      : import.meta.env.VITE_API_URL ||
+        "https://walletpay-backend-4r7o.onrender.com";
+
+    const socket = io(SOCKET_URL, {
+      auth: {
+        token,
+      },
+      transports: ["websocket", "polling"],
+    });
 
     socket.on("connect", () => {
-      console.log("Connected to Socket.IO server:", socket.id);
+      console.log("Connected to Socket.IO:", socket.id);
       setConnected(true);
     });
 
     socket.on("disconnect", (reason) => {
-      console.log("Disconnected from Socket.IO server:", reason);
+      console.log("Socket disconnected:", reason);
       setConnected(false);
     });
 
@@ -51,7 +56,7 @@ export function SocketProvider({ children }) {
     });
 
     socket.on("notification", (notification) => {
-      console.log("New notification:", notification);
+      console.log("New notification received:", notification);
 
       setNotifications((previous) => [
         {

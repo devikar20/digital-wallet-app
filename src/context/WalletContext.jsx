@@ -11,22 +11,21 @@ import { useAuth } from "./AuthContext";
 
 const WalletContext = createContext();
 
-export const useWallet = () => {
-  return useContext(WalletContext);
-};
+export const useWallet = () => useContext(WalletContext);
 
-const API_URL = "https://walletpay-backend-4r7o.onrender.com/api/transactions";
+const API_URL = `${
+  import.meta.env.DEV
+    ? "http://localhost:5001"
+    : import.meta.env.VITE_API_URL ||
+      "https://walletpay-backend-4r7o.onrender.com"
+}/api/transactions`;
 
-// Convert MongoDB transaction data into the format used by the UI
 const formatTransaction = (transaction) => ({
   ...transaction,
-
   id: transaction._id || transaction.id,
-
   date: transaction.date
     ? new Date(transaction.date).toLocaleString()
     : "",
-
   icon:
     transaction.type === "income"
       ? "💰"
@@ -35,7 +34,6 @@ const formatTransaction = (transaction) => ({
       : transaction.category === "Shopping"
       ? "🛍️"
       : "↗️",
-
   color:
     transaction.type === "income"
       ? "bg-green-100"
@@ -52,17 +50,20 @@ export const WalletProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Headers containing JWT token
-  const getAuthHeaders = useCallback(() => ({
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  }), [token]);
+  const getAuthHeaders = useCallback(
+    () => ({
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    }),
+    [token]
+  );
 
-  // Fetch wallet transactions and summary
+  // REFRESH WALLET
   const refreshWallet = useCallback(async () => {
     if (!token) {
       setBalance(0);
       setTransactions([]);
+
       return {
         success: false,
         message: "Please log in first.",
@@ -86,16 +87,12 @@ export const WalletProvider = ({ children }) => {
       const transactionsResult = await transactionsResponse.json();
       const summaryResult = await summaryResponse.json();
 
-      if (
-        !transactionsResponse.ok ||
-        !summaryResponse.ok
-      ) {
-        const message =
+      if (!transactionsResponse.ok || !summaryResponse.ok) {
+        throw new Error(
           transactionsResult.message ||
           summaryResult.message ||
-          "Failed to fetch wallet data.";
-
-        throw new Error(message);
+          "Failed to fetch wallet data."
+        );
       }
 
       setTransactions(
@@ -106,7 +103,6 @@ export const WalletProvider = ({ children }) => {
 
       return {
         success: true,
-        message: "Wallet data loaded successfully.",
       };
     } catch (err) {
       console.error("Wallet API Error:", err);
@@ -121,7 +117,7 @@ export const WalletProvider = ({ children }) => {
     }
   }, [token, getAuthHeaders]);
 
-  // Fetch wallet data after login
+  // AUTOMATIC WALLET REFRESH
   useEffect(() => {
     if (isAuthenticated && token) {
       refreshWallet();
@@ -132,7 +128,7 @@ export const WalletProvider = ({ children }) => {
     }
   }, [isAuthenticated, token, refreshWallet]);
 
-  // Add money using POST API
+  // ADD MONEY
   const addMoney = async (amount) => {
     if (!Number.isFinite(amount) || amount <= 0) {
       return {
@@ -150,7 +146,7 @@ export const WalletProvider = ({ children }) => {
           amount: Number(amount),
           type: "income",
           category: "Wallet Top-up",
-          date: new Date().toISOString().slice(0, 10),
+          date: new Date().toISOString(),
         }),
       });
 
@@ -163,12 +159,7 @@ export const WalletProvider = ({ children }) => {
         };
       }
 
-      setTransactions((previous) => [
-        formatTransaction(result.data),
-        ...previous,
-      ]);
-
-      setBalance(result.balance);
+      await refreshWallet();
 
       return {
         success: true,
@@ -184,50 +175,40 @@ export const WalletProvider = ({ children }) => {
     }
   };
 
-  // Send money using POST API
-  const sendMoney = async (amount) => {
-    if (!Number.isFinite(amount) || amount <= 0) {
+  // SEARCH RECIPIENT USING ACCOUNT ID
+  const findRecipient = async (accountId) => {
+    const cleanAccountId = String(accountId || "").trim();
+
+    if (!/^\d{6}$/.test(cleanAccountId)) {
       return {
         success: false,
-        message: "Enter a valid amount.",
+        message: "Enter a valid 6-digit Account ID.",
       };
     }
 
     try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          name: "Money Sent",
-          amount: Number(amount),
-          type: "expense",
-          category: "Transfer",
-          date: new Date().toISOString().slice(0, 10),
-        }),
-      });
+      const response = await fetch(
+        `${API_URL}/recipients?accountId=${encodeURIComponent(cleanAccountId)}`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
 
       const result = await response.json();
 
       if (!response.ok) {
         return {
           success: false,
-          message: result.message || "Could not send money.",
+          message: result.message || "Recipient not found.",
         };
       }
 
-      setTransactions((previous) => [
-        formatTransaction(result.data),
-        ...previous,
-      ]);
-
-      setBalance(result.balance);
-
       return {
         success: true,
-        message: `₹${amount.toLocaleString("en-IN")} sent successfully!`,
+        recipient: result.data,
       };
     } catch (err) {
-      console.error("Send Money Error:", err);
+      console.error("Recipient Search Error:", err);
 
       return {
         success: false,
@@ -236,12 +217,73 @@ export const WalletProvider = ({ children }) => {
     }
   };
 
-  // Shared context values
+  // TRANSFER MONEY USING ACCOUNT ID
+  const sendMoney = async (
+    amount,
+    recipientAccountId,
+    description = ""
+  ) => {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return {
+        success: false,
+        message: "Enter a valid amount.",
+      };
+    }
+
+    const cleanAccountId = String(
+      recipientAccountId || ""
+    ).trim();
+
+    if (!/^\d{6}$/.test(cleanAccountId)) {
+      return {
+        success: false,
+        message: "Enter a valid recipient Account ID.",
+      };
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/transfer`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          recipientAccountId: cleanAccountId,
+          amount: Number(amount),
+          description,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Transfer failed.",
+        };
+      }
+
+      await refreshWallet();
+
+      return {
+        success: true,
+        message: result.message,
+        data: result.data,
+      };
+    } catch (err) {
+      console.error("Transfer Error:", err);
+
+      return {
+        success: false,
+        message: "Unable to connect to the server.",
+      };
+    }
+  };
+
   const value = {
     balance,
     transactions,
     addMoney,
     sendMoney,
+    findRecipient,
     refreshWallet,
     loading,
     error,

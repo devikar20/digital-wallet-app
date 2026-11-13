@@ -7,7 +7,12 @@ import {
 
 const AuthContext = createContext();
 
-const API_URL = "https://walletpay-backend-4r7o.onrender.com/api/auth";
+const API_URL = `${
+  import.meta.env.DEV
+    ? "http://localhost:5001"
+    : import.meta.env.VITE_API_URL ||
+      "https://walletpay-backend-4r7o.onrender.com"
+}/api/auth`;
 
 export const useAuth = () => {
   return useContext(AuthContext);
@@ -23,7 +28,7 @@ export const AuthProvider = ({ children }) => {
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  // Register
+  // REGISTER
   const register = async (name, email, password) => {
     try {
       const response = await fetch(`${API_URL}/register`, {
@@ -39,17 +44,20 @@ export const AuthProvider = ({ children }) => {
       if (!response.ok) {
         return {
           success: false,
-          message: result.message,
+          message: result.message || "Registration failed.",
         };
       }
 
-      saveLogin(result);
-
+      // Return Account ID without logging the user in
       return {
         success: true,
         message: result.message,
+        user: result.user,
+        accountId: result.user?.accountId,
       };
     } catch (error) {
+      console.error("Registration error:", error);
+
       return {
         success: false,
         message: "Unable to connect to the server.",
@@ -57,7 +65,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Login
+  // LOGIN
   const login = async (email, password) => {
     try {
       const response = await fetch(`${API_URL}/login`, {
@@ -73,7 +81,7 @@ export const AuthProvider = ({ children }) => {
       if (!response.ok) {
         return {
           success: false,
-          message: result.message,
+          message: result.message || "Login failed.",
         };
       }
 
@@ -82,8 +90,11 @@ export const AuthProvider = ({ children }) => {
       return {
         success: true,
         message: result.message,
+        user: result.user,
       };
     } catch (error) {
+      console.error("Login error:", error);
+
       return {
         success: false,
         message: "Unable to connect to the server.",
@@ -91,9 +102,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Save token and user information
+  // SAVE TOKEN AND USER INFORMATION
   const saveLogin = (result) => {
     localStorage.setItem("walletToken", result.token);
+
     localStorage.setItem(
       "walletUser",
       JSON.stringify(result.user)
@@ -103,7 +115,7 @@ export const AuthProvider = ({ children }) => {
     setUser(result.user);
   };
 
-  // Logout
+  // LOGOUT
   const logout = () => {
     localStorage.removeItem("walletToken");
     localStorage.removeItem("walletUser");
